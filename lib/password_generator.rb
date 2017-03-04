@@ -47,7 +47,7 @@ module PasswordGenerator
         end
 
         opts.on("--with=WITH") do |with|
-          raise "with must be words or ascii" if !%w[words ascii ascii_lower].include?(with)
+          raise "with must be words or ascii" if !%w[words words_numbers ascii ascii_lower lower_number].include?(with)
           options[:with] = with.to_sym
         end
       end.parse(argv)
@@ -62,6 +62,12 @@ module PasswordGenerator
       elsif @options[:with] == :ascii_lower
         base_gen = PasswordGenerator::CharPicker.new(nil, [("A".."Z")])
         separator = ""
+      elsif @options[:with] == :lower_number
+        base_gen = PasswordGenerator::CharPicker.new([("0".."9"), ("a".."z")])
+        separator = ""
+      elsif @options[:with] == :words_numbers
+        base_gen = PasswordGenerator::WordListPicker.new
+        separator = PasswordGenerator::CharPicker.new_number
       else
         base_gen = PasswordGenerator::WordListPicker.new
         separator = " "
@@ -133,19 +139,19 @@ module PasswordGenerator
     alias selection_set characters
 
     def self.new_upper
-      new("A".."Z")
+      new(["A".."Z"])
     end
 
     def self.new_lower
-      new("a".."z")
+      new(["a".."z"])
     end
 
     def self.new_number
-      new("0".."9")
+      new(["0".."9"])
     end
 
     def self.new_symbol
-      new("!".."~", [("0".."9"), ("A".."Z"), ("a".."z")])
+      new(["!".."~"], [("0".."9"), ("A".."Z"), ("a".."z")])
     end
   end
 
@@ -158,7 +164,7 @@ module PasswordGenerator
 
     def generate
       @generators.inject(StringWithEntropy.new) do |str, gen|
-        str << @separator if !str.empty?
+        str << (@separator.respond_to?(:generate) ? @separator.generate : @separator) if !str.empty?
         str << gen.generate
       end
     end
