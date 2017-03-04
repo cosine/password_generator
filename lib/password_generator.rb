@@ -47,7 +47,7 @@ module PasswordGenerator
         end
 
         opts.on("--with=WITH") do |with|
-          raise "with must be words or ascii" if !%w[words ascii].include?(with)
+          raise "with must be words or ascii" if !%w[words ascii ascii_lower].include?(with)
           options[:with] = with.to_sym
         end
       end.parse(argv)
@@ -58,6 +58,9 @@ module PasswordGenerator
     def run(output = $stdout)
       if @options[:with] == :ascii
         base_gen = PasswordGenerator::CharPicker.new
+        separator = ""
+      elsif @options[:with] == :ascii_lower
+        base_gen = PasswordGenerator::CharPicker.new(nil, [("A".."Z")])
         separator = ""
       else
         base_gen = PasswordGenerator::WordListPicker.new
