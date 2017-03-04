@@ -73,9 +73,11 @@ module PasswordGenerator
         separator = " "
       end
 
-      needed = (@options[:bits] / base_gen.entropy.to_f).ceil
+      separator_entropy = (separator.respond_to?(:entropy) ? separator.entropy : 0)
+      needed = (@options[:bits] / (base_gen.entropy.to_f + separator_entropy)).ceil
       gen = PasswordGenerator::AppendGenerator.new([base_gen] * needed, separator)
       pw = gen.generate
+      pw << separator.generate if pw.entropy < @options[:bits]
       output.puts "Your Secure Password is: #{pw}"
       output.puts "Bits Entropy of Security: %.2f" % pw.entropy
     end
