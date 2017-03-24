@@ -47,7 +47,7 @@ module PasswordGenerator
         end
 
         opts.on("--with=WITH") do |with|
-          raise "with must be words or ascii" if !%w[words words_numbers ascii ascii_lower lower_number].include?(with)
+          raise "--with value must be one of: #{GeneratorTypes.keys.join(", ")}" if !GeneratorTypes.has_key?(with.to_sym)
           options[:with] = with.to_sym
         end
       end.parse(argv)
@@ -56,23 +56,9 @@ module PasswordGenerator
     end
 
     def run(output = $stdout)
-      if @options[:with] == :ascii
-        base_gen = PasswordGenerator::CharPicker.new
-        separator = ""
-      elsif @options[:with] == :ascii_lower
-        base_gen = PasswordGenerator::CharPicker.new(nil, [("A".."Z")])
-        separator = ""
-      elsif @options[:with] == :lower_number
-        base_gen = PasswordGenerator::CharPicker.new([("0".."9"), ("a".."z")])
-        separator = ""
-      elsif @options[:with] == :words_numbers
-        base_gen = PasswordGenerator::WordListPicker.new
-        separator = PasswordGenerator::CharPicker.new_number
-      else
-        base_gen = PasswordGenerator::WordListPicker.new
-        separator = " "
-      end
-
+      gen_info = GeneratorTypes[@options[:with]] || raise("invalid generator information")
+      base_gen = gen_info[:generator]
+      separator = gen_info[:separator]
       separator_entropy = (separator.respond_to?(:entropy) ? separator.entropy : 0)
       needed = (@options[:bits] / (base_gen.entropy.to_f + separator_entropy)).ceil
       gen = PasswordGenerator::AppendGenerator.new([base_gen] * needed, separator)
@@ -175,4 +161,28 @@ module PasswordGenerator
       @generators.inject(0.0) { |e, gen| e + gen.entropy }
     end
   end
+
+  GeneratorTypes = {
+    words: {
+      generator: PasswordGenerator::WordListPicker.new,
+      separator: " ",
+    },
+    words_numbers: {
+      generator: PasswordGenerator::WordListPicker.new,
+      separator: PasswordGenerator::CharPicker.new_number,
+    },
+    ascii: {
+      generator: PasswordGenerator::CharPicker.new,
+      separator: "",
+    },
+    ascii_lower: {
+      generator: PasswordGenerator::CharPicker.new(nil, [("A".."Z")]),
+      separator: "",
+    },
+    lower_number: {
+      generator: PasswordGenerator::CharPicker.new([("0".."9"), ("a".."z")]),
+      separator: "",
+    },
+  }
+
 end
