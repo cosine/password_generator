@@ -60,7 +60,7 @@ module PasswordGenerator
       base_gen = gen_info[:generator]
       separator = gen_info[:separator]
       separator_entropy = (separator.respond_to?(:entropy) ? separator.entropy : 0)
-      needed = (@options[:bits] / (base_gen.entropy.to_f + separator_entropy)).ceil
+      needed = (@options[:bits] / (base_gen.minimum_entropy.to_f + separator_entropy)).ceil
       gen = PasswordGenerator::AppendGenerator.new([base_gen] * needed, separator)
       pw = gen.generate
       pw << separator.generate if pw.entropy < @options[:bits]
@@ -90,10 +90,10 @@ module PasswordGenerator
   # Picks something randomly from a set.  This is generally meant to be subclassed.
   class Picker < SimpleGenerator
     def generate
-      StringWithEntropy.new(rand_index(selection_set), entropy)
+      StringWithEntropy.new(rand_index(selection_set), minimum_entropy)
     end
 
-    def entropy
+    def minimum_entropy
       bits_entropy(selection_set.size)
     end
   end
@@ -143,6 +143,16 @@ module PasswordGenerator
     end
   end
 
+  class CasePicker < Picker
+    def initialize(string)
+      @string = string
+    end
+
+    def selection_set
+      [@string.downcase, @string.upcase].uniq
+    end
+  end
+
   # Appends strings from other generators together.
   class AppendGenerator < SimpleGenerator
     def initialize(generators, separator = "")
@@ -157,8 +167,31 @@ module PasswordGenerator
       end
     end
 
-    def entropy
+    def minimum_entropy
       @generators.inject(0.0) { |e, gen| e + gen.entropy }
+    end
+  end
+
+  class CapitalizeModifier < SimpleGenerator
+    def initialize(generator, options = {})
+      @generator = generator
+      @method = options[:method] || :first_last
+    end
+
+    def generate
+      str = @generator.generate
+
+      if str != str.downcase
+        str
+      elsif str.size == 1
+        CasePicker.new(str).generate
+      else
+        CasePicker.new(str[0]).generate << StringWithEntropy.new(str[1..-2], str.entropy) << CasePicker.new(str[-1]).generate
+      end
+    end
+
+    def minimum_entropy
+      @generator.minimum_entropy
     end
   end
 
@@ -182,6 +215,10 @@ module PasswordGenerator
     lower_number: {
       generator: PasswordGenerator::CharPicker.new([("0".."9"), ("a".."z")]),
       separator: "",
+    },
+    words_cases: {
+      generator: PasswordGenerator::CapitalizeModifier.new(PasswordGenerator::WordListPicker.new),
+      separator: " ",
     },
   }
 
