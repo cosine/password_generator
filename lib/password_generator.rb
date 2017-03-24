@@ -220,6 +220,10 @@ module PasswordGenerator
       generator: PasswordGenerator::CapitalizeModifier.new(PasswordGenerator::WordListPicker.new),
       separator: " ",
     },
+    words_cases_numbers: {
+      generator: PasswordGenerator::CapitalizeModifier.new(PasswordGenerator::WordListPicker.new),
+      separator: PasswordGenerator::CharPicker.new_number,
+    },
   }
 
 end
