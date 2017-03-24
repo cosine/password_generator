@@ -57,15 +57,18 @@ module PasswordGenerator
 
     def run(output = $stdout)
       gen_info = GeneratorTypes[@options[:with]] || raise("invalid generator information")
-      base_gen = gen_info[:generator]
-      separator = gen_info[:separator]
-      separator_entropy = (separator.respond_to?(:entropy) ? separator.entropy : 0)
-      needed = (@options[:bits] / (base_gen.minimum_entropy.to_f + separator_entropy)).ceil
-      gen = PasswordGenerator::AppendGenerator.new([base_gen] * needed, separator)
-      pw = gen.generate
-      pw << separator.generate if pw.entropy < @options[:bits]
+      gen_parts = [gen_info[:generator], gen_info[:separator]].dup
+      pw = StringWithEntropy.new
+
+      # Now tack on more parts until we reach enough entropy.
+      while pw.entropy < @options[:bits]
+        gen_parts.push(next_gen = gen_parts.shift)
+        pw << (next_gen.respond_to?(:generate) ? next_gen.generate : next_gen)
+      end
+
       output.puts "Your Secure Password is: #{pw}"
       output.puts "Bits Entropy of Security: %.2f" % pw.entropy
+      output.puts "Length of Password: #{pw.size} characters"
     end
   end
 
@@ -119,7 +122,7 @@ module PasswordGenerator
 
     def characters
       @characters ||= begin
-        chars = @ranges.inject([]) { |a, range| a.push(*range.to_a) }.uniq
+        chars = @ranges.inject([]) { |a, range| range = [range] if !range.respond_to?(:to_a) ; a.push(*range.to_a) }.uniq
         @exclusions.each { |excl| chars -= excl.to_a } if @exclusions
         chars
       end
@@ -138,12 +141,26 @@ module PasswordGenerator
       new(["0".."9"])
     end
 
+    def self.new_number_with_shifts
+      new(["0".."9", "!", "@", "#", "$", "%", "^", "&", "*", "(", ")"])
+    end
+
     def self.new_symbol
       new(["!".."~"], [("0".."9"), ("A".."Z"), ("a".."z")])
     end
   end
 
   class CasePicker < Picker
+    def initialize(string)
+      @string = string
+    end
+
+    def selection_set
+      [@string.downcase, @string.upcase].uniq
+    end
+  end
+
+  class NumberShiftPicker < Picker
     def initialize(string)
       @string = string
     end
@@ -204,6 +221,10 @@ module PasswordGenerator
       generator: PasswordGenerator::WordListPicker.new,
       separator: PasswordGenerator::CharPicker.new_number,
     },
+    words_shiftnumbers: {
+      generator: PasswordGenerator::WordListPicker.new,
+      separator: PasswordGenerator::CharPicker.new_number_with_shifts,
+    },
     ascii: {
       generator: PasswordGenerator::CharPicker.new,
       separator: "",
@@ -223,6 +244,10 @@ module PasswordGenerator
     words_cases_numbers: {
       generator: PasswordGenerator::CapitalizeModifier.new(PasswordGenerator::WordListPicker.new),
       separator: PasswordGenerator::CharPicker.new_number,
+    },
+    words_cases_shiftnumbers: {
+      generator: PasswordGenerator::CapitalizeModifier.new(PasswordGenerator::WordListPicker.new),
+      separator: PasswordGenerator::CharPicker.new_number_with_shifts,
     },
   }
 
