@@ -103,14 +103,21 @@ module PasswordGenerator
 
   # Selects a random word from a list.
   class WordListPicker < Picker
+    DEFAULT_WORDLIST = File.join(File.dirname(__FILE__), "wordlist.txt")
+
     def initialize(filename = nil)
-      @wordlist_filename = filename || File.join(File.dirname(__FILE__), "wordlist.txt")
+      @wordlist_filename = filename || self.class::DEFAULT_WORDLIST
     end
 
     def words
       @words ||= File.read(@wordlist_filename).split(/\n/).uniq.reject { |word| word.empty? }
     end
     alias selection_set words
+  end
+
+  # Use Diceware words instead.
+  class DicewarePicker < WordListPicker
+    DEFAULT_WORDLIST = File.join(File.dirname(__FILE__), "wordlist-diceware.txt")
   end
 
   # Selects a random printable character, or maybe also space.
@@ -248,6 +255,10 @@ module PasswordGenerator
     words_cases_shiftnumbers: {
       generator: PasswordGenerator::CapitalizeModifier.new(PasswordGenerator::WordListPicker.new),
       separator: PasswordGenerator::CharPicker.new_number_with_shifts,
+    },
+    diceware: {
+      generator: PasswordGenerator::DicewarePicker.new,
+      separator: " ",
     },
   }
 
